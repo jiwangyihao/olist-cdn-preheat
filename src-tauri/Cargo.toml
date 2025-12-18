@@ -1,14 +1,14 @@
 [package]
-name = "nuxtor"
-version = "1.5.0"
-description = "Starter template for Nuxt 4 and Tauri 2"
-authors = [ "NicolaSpadari" ]
-license = "MIT"
-repository = "https://github.com/NicolaSpadari/nuxtor"
+name = "olist-cdn-preheat"
+version = "0.1.0"
+description = "OpenList CDN Preheat Desktop App"
+authors = [ "jiwangyihao" ]
+license = "MPL-2.0"
+repository = "https://github.com/jiwangyihao/olist-cdn-preheat"
 edition = "2021"
 
 [lib]
-name = "nuxtor_lib"
+name = "olist_cdn_preheat_lib"
 crate-type = [
   "staticlib",
   "cdylib",

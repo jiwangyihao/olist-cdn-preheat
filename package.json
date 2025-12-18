@@ -1,12 +1,16 @@
 {
-	"name": "nuxtor",
+	"name": "olist-cdn-preheat",
 	"type": "module",
-	"version": "1.5.0",
+	"version": "0.1.0",
 	"private": true,
 	"packageManager": "bun@1.2.22",
-	"description": "Starter template for Nuxt 4 and Tauri 2",
-	"author": "Nicola Spadari",
-	"license": "MIT",
+	"description": "OpenList CDN Preheat Desktop App",
+	"author": "jiwangyihao",
+	"license": "MPL-2.0",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/jiwangyihao/olist-cdn-preheat"
+	},
 	"engines": {
 		"node": ">=23"
 	},

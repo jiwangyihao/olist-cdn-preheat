@@ -16,7 +16,7 @@
 		],
 		"resources": [],
 		"externalBin": [],
-		"copyright": "",
+		"copyright": "Copyright © 2025 jiwangyihao",
 		"category": "DeveloperTool",
 		"shortDescription": "",
 		"longDescription": "",
@@ -31,14 +31,14 @@
 		"beforeDevCommand": "bun run dev",
 		"devUrl": "http://localhost:3000"
 	},
-	"productName": "Nuxtor",
-	"version": "1.5.0",
-	"identifier": "com.nicolaspadari.nuxtor",
+	"productName": "OpenList CDN Preheat",
+	"version": "0.1.0",
+	"identifier": "top.jwyihao.olist-cdn-preheat",
 	"plugins": {},
 	"app": {
 		"windows": [
 			{
-				"title": "Nuxtor",
+				"title": "OpenList CDN Preheat",
 				"width": 1366,
 				"height": 768,
 				"minWidth": 375,

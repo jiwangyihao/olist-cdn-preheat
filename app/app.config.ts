@@ -1,29 +1,8 @@
 export default defineAppConfig({
 	app: {
-		name: "Nuxtor",
-		author: "Nicola Spadari",
-		repo: "https://github.com/NicolaSpadari/nuxtor",
-		tauriSite: "https://tauri.app",
-		nuxtSite: "https://nuxt.com",
-		nuxtUiSite: "https://ui4.nuxt.dev"
-	},
-	pageCategories: {
-		system: {
-			label: "System",
-			icon: "lucide:square-terminal"
-		},
-		storage: {
-			label: "Storage",
-			icon: "lucide:archive"
-		},
-		interface: {
-			label: "Interface",
-			icon: "lucide:app-window-mac"
-		},
-		other: {
-			label: "Other",
-			icon: "lucide:folder"
-		}
+		name: "OpenList CDN Preheat",
+		author: "jiwangyihao",
+		repo: "https://github.com/jiwangyihao/olist-cdn-preheat"
 	},
 	ui: {
 		colors: {

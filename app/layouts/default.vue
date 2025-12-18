@@ -1,7 +1,5 @@
 <template>
 	<div>
-		<SiteNavbar />
-
 		<UContainer>
 			<slot />
 		</UContainer>

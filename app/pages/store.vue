@@ -49,13 +49,12 @@
 	const toast = useToast();
 	const autosave = ref(false);
 
-	const store = await useTauriStoreLoad("store.bin", {
-		autoSave: autosave.value
-	});
+	let store: any;
 
 	const getStoreValue = async () => {
+		if (!store) return;
 		try {
-			outputState.value.content = await store.get<string>("myData") || "";
+			outputState.value.content = await store.get("myData") || "";
 		} catch (error) {
 			toast.add({
 				title: "Error",
@@ -66,9 +65,19 @@
 		}
 	};
 
-	await getStoreValue();
+	onMounted(async () => {
+		try {
+			store = await useTauriStoreLoad("store.bin", {
+				autoSave: autosave.value
+			});
+			await getStoreValue();
+		} catch (error) {
+			console.error("Failed to load store:", error);
+		}
+	});
 
 	const setStoreValue = async () => {
+		if (!store) return;
 		try {
 			await store.set("myData", inputState.value!.value);
 			await getStoreValue();

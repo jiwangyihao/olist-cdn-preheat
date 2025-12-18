@@ -19,17 +19,23 @@
 		{
 			label: "System",
 			icon: "lucide:monitor",
-			content: `${useTauriOsPlatform()} ${useTauriOsVersion()}`
+			content: "..."
 		},
 		{
 			label: "Arch",
 			icon: "lucide:microchip",
-			content: useTauriOsArch()
+			content: "..."
 		},
 		{
 			label: "Locale",
 			icon: "lucide:globe",
-			content: await useTauriOsLocale() || "Not detectable"
+			content: "..."
 		}
 	]);
+
+	onMounted(async () => {
+		items.value[0].content = `${useTauriOsPlatform()} ${useTauriOsVersion()}`;
+		items.value[1].content = useTauriOsArch();
+		items.value[2].content = await useTauriOsLocale() || "Not detectable";
+	});
 </script>

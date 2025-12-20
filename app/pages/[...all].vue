@@ -6,14 +6,14 @@
 			</p>
 			<div class="text-center space-y-3">
 				<h1 class="text-3xl font-bold tracking-tight" sm="text-5xl">
-					Page not found
+					页面未找到
 				</h1>
 				<p class="text-base text-(--ui-muted) leading-7">
-					Sorry, we couldn't find the page you're looking for.
+					抱歉，我们找不到您要访问的页面。
 				</p>
 			</div>
 			<UButton to="/" variant="outline" size="lg" :ui="{ base: 'px-5' }">
-				Go home
+				返回首页
 			</UButton>
 		</div>
 	</div>

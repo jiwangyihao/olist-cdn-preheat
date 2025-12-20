@@ -1,11 +1,18 @@
 <template>
-	<div class="py-10">
-		<h1 class="text-2xl font-bold mb-4">
-			OpenList CDN Preheat
-		</h1>
-		<p>Ready to start development.</p>
+	<div class="flex items-center justify-center h-screen">
+		<UIcon name="i-mingcute-loading-3-fill" class="animate-spin text-4xl text-gray-400" />
 	</div>
 </template>
 
-<script lang="ts" setup>
+<script setup lang="ts">
+	const router = useRouter();
+
+	onMounted(() => {
+		const settings = localStorage.getItem("site_settings");
+		if (settings) {
+			router.replace("/preheat");
+		} else {
+			router.replace("/site");
+		}
+	});
 </script>

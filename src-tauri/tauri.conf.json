@@ -36,6 +36,7 @@
 	"identifier": "top.jwyihao.olist-cdn-preheat",
 	"plugins": {},
 	"app": {
+		"withGlobalTauri": true,
 		"windows": [
 			{
 				"title": "OpenList CDN Preheat",

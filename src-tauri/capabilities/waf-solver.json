@@ -1,0 +1,15 @@
+{
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "waf-solver",
+	"description": "Capabilities for the WAF solver window",
+	"windows": ["waf_solver_*"],
+	"remote": {
+		"urls": ["https://olist.jwyihao.top/*", "http://olist.jwyihao.top/*"]
+	},
+	"permissions": [
+		{
+			"identifier": "core:event:allow-emit",
+			"allow": ["waf_result"]
+		}
+	]
+}

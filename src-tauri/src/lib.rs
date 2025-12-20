@@ -1,3 +1,14 @@
+mod api;
+mod commands;
+mod crawler;
+mod error;
+mod models;
+mod preheater;
+mod rate_limit;
+mod state;
+
+use state::AppState;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 
 use tauri::{
@@ -7,6 +18,7 @@ use tauri::{
 
 pub fn run() {
     tauri::Builder::default()
+        .manage(AppState::new())
 		.setup(|app| {
 			let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 			let menu = Menu::with_items(app, &[&quit_i])?;
@@ -32,6 +44,12 @@ pub fn run() {
 		.plugin(tauri_plugin_os::init())
 		.plugin(tauri_plugin_fs::init())
 		.plugin(tauri_plugin_store::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            commands::crawl,
+            commands::start_run,
+            commands::cancel_run,
+            commands::retry_files
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

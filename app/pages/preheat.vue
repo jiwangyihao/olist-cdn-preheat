@@ -82,8 +82,19 @@
 							<!-- Details -->
 							<div v-if="crawling" class="space-y-2">
 								<UTooltip :text="crawlStats.current_path" :popper="{ placement: 'top' }" class="w-full">
-									<div class="text-[10px] text-gray-500 truncate cursor-help bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded border border-gray-100 dark:border-gray-800">
-										{{ crawlStats.current_path }}
+									<div class="flex items-center gap-1.5 text-[10px] text-gray-500 cursor-help bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded border border-gray-100 dark:border-gray-800">
+										<UBadge
+											v-if="runAllSites && sitesList.length > 1"
+											color="neutral"
+											variant="subtle"
+											size="xs"
+											class="shrink-0"
+										>
+											{{ getSiteById(crawlStats.siteId)?.name || '未知站点' }}
+										</UBadge>
+										<div class="truncate w-full font-mono">
+											{{ crawlStats.current_path }}
+										</div>
 									</div>
 								</UTooltip>
 								<div class="flex justify-between text-[10px] text-gray-500 tabular-nums">
@@ -142,46 +153,150 @@
 					<!-- Settings -->
 					<UCard v-if="siteSettings" class="flex flex-col flex-1 min-h-0" :ui="{ body: 'overflow-y-auto flex-1 min-h-0' }">
 						<template #header>
-							<div class="text-sm font-bold">
-								设置
+							<div class="flex items-center justify-between gap-2">
+								<div class="text-sm font-bold">
+									设置
+								</div>
+								<UButton
+									to="/site"
+									color="neutral"
+									variant="ghost"
+									size="xs"
+									icon="i-heroicons-cog-6-tooth"
+								>
+									管理站点
+								</UButton>
 							</div>
 						</template>
-						<div class="space-y-3">
-							<UFormField label="API 地址">
-								<UInput v-model="siteSettings.apiBaseUrl" />
-							</UFormField>
-							<UFormField label="Token">
-								<UInput v-model="siteSettings.token" type="password" />
-							</UFormField>
-							<UFormField label="起始路径">
-								<UInput v-model="siteSettings.startPath" />
-							</UFormField>
-							<UAccordion :items="[{ label: '运行设置', slot: 'run-settings' }, { label: '高级设置', slot: 'advanced' }]">
-								<template #run-settings>
-									<div class="space-y-3 pt-2">
-										<UFormField label="最大并发数">
-											<UInput v-model.number="runSettings.maxConn" type="number" />
-										</UFormField>
-										<UFormField label="速度限制 (MB/s, 0为不限)">
-											<UInput v-model.number="rateLimitMB" type="number" />
-										</UFormField>
+						<UAccordion
+							:items="settingsAccordionItems"
+							:default-value="settingsAccordionDefault"
+							type="multiple"
+						>
+							<template #site-settings>
+								<div class="space-y-3 pt-2">
+									<div class="space-y-2 pb-3 border-b border-gray-100 dark:border-gray-800">
+										<div class="flex items-center justify-between gap-2">
+											<div class="text-xs text-gray-500">
+												运行范围
+											</div>
+											<UBadge v-if="runAllSites" color="primary" variant="subtle" size="xs">
+												所有站点
+											</UBadge>
+										</div>
+										<div class="flex items-center gap-1">
+											<UButton
+												size="xs"
+												color="neutral"
+												:variant="runScope === 'active' ? 'solid' : 'ghost'"
+												:disabled="busy"
+												@click="runScope = 'active'"
+											>
+												当前站点
+											</UButton>
+											<UButton
+												size="xs"
+												color="neutral"
+												:variant="runScope === 'all' ? 'solid' : 'ghost'"
+												:disabled="busy || sitesList.length <= 1"
+												@click="runScope = 'all'"
+											>
+												所有站点
+											</UButton>
+										</div>
+										<div v-if="runScope === 'all' && sitesList.length > 1" class="text-[10px] text-gray-500 leading-relaxed">
+											扫描：按站点轮转启动请求；预热：优先从剩余任务最多的站点分配新任务。
+										</div>
 									</div>
-								</template>
-								<template #advanced>
-									<div class="space-y-3 pt-2">
-										<UFormField label="代理地址">
-											<UInput v-model="siteSettings.proxyUrl" placeholder="http://..." />
-										</UFormField>
-										<UFormField label="User Agent">
-											<UInput v-model="siteSettings.userAgent" />
-										</UFormField>
-										<UFormField label="Cookie">
-											<UTextarea v-model="siteSettings.cookie" :rows="2" />
-										</UFormField>
+									<div v-if="sitesList.length > 1" class="space-y-2 pb-3 border-b border-gray-100 dark:border-gray-800">
+										<div class="flex items-center justify-between gap-2">
+											<div class="text-xs text-gray-500">
+												当前站点
+											</div>
+											<UBadge v-if="busy" color="warning" variant="subtle" size="xs">
+												运行中不可切换
+											</UBadge>
+										</div>
+										<div class="flex flex-col gap-1">
+											<button
+												v-for="s in sitesList"
+												:key="s.id"
+												type="button"
+												class="w-full text-left rounded-md px-2 py-2 border transition-colors"
+												:disabled="busy"
+												:class="s.id === activeSiteId ? 'border-primary-500/60 bg-primary-50 dark:bg-primary-900/10' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-800/40'"
+												@click="selectActiveSite(s.id)"
+											>
+												<div class="flex items-center justify-between gap-2">
+													<div class="min-w-0">
+														<div class="text-xs font-medium truncate">
+															{{ s.name || '未命名站点' }}
+														</div>
+														<div class="text-[10px] text-gray-500 truncate font-mono" :title="formatSiteHint(s)">
+															{{ formatSiteHint(s) }}
+														</div>
+													</div>
+													<UBadge v-if="s.id === activeSiteId" color="primary" size="xs" variant="subtle">
+														当前
+													</UBadge>
+												</div>
+											</button>
+										</div>
 									</div>
-								</template>
-							</UAccordion>
-						</div>
+									<UCollapsible v-model:open="siteFieldsOpen" :unmount-on-hide="false">
+										<template #default="{ open }">
+											<button
+												type="button"
+												class="w-full flex items-center justify-between gap-2 py-1 text-xs text-gray-600 dark:text-gray-300"
+											>
+												<span class="font-medium">站点参数</span>
+												<UIcon
+													name="i-heroicons-chevron-down"
+													class="w-4 h-4 transition-transform"
+													:class="open ? 'rotate-180' : ''"
+												/>
+											</button>
+										</template>
+										<template #content>
+											<div class="space-y-3 pt-2">
+												<UFormField label="API 地址">
+													<UInput v-model="siteSettings.apiBaseUrl" />
+												</UFormField>
+												<UFormField label="Token">
+													<UInput v-model="siteSettings.token" type="password" />
+												</UFormField>
+												<UFormField label="起始路径">
+													<UInput v-model="siteSettings.startPath" />
+												</UFormField>
+											</div>
+										</template>
+									</UCollapsible>
+								</div>
+							</template>
+							<template #run-settings>
+								<div class="space-y-3 pt-2">
+									<UFormField label="最大并发数">
+										<UInput v-model.number="runSettings.maxConn" type="number" />
+									</UFormField>
+									<UFormField label="速度限制 (MB/s, 0为不限)">
+										<UInput v-model.number="rateLimitMB" type="number" />
+									</UFormField>
+								</div>
+							</template>
+							<template #advanced>
+								<div class="space-y-3 pt-2">
+									<UFormField label="代理地址">
+										<UInput v-model="siteSettings.proxyUrl" placeholder="http://..." />
+									</UFormField>
+									<UFormField label="User Agent">
+										<UInput v-model="siteSettings.userAgent" />
+									</UFormField>
+									<UFormField label="Cookie">
+										<UTextarea v-model="siteSettings.cookie" :rows="2" />
+									</UFormField>
+								</div>
+							</template>
+						</UAccordion>
 					</UCard>
 				</div>
 			</div>
@@ -197,6 +312,12 @@
 					:ui="{ root: 'gap-0!' }"
 				/>
 				<div class="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+					<div class="text-[11px] font-mono tabular-nums text-gray-500 dark:text-gray-400 select-none">
+						平均：
+						<span class="text-gray-900 dark:text-gray-100">
+							{{ filteredAvgSpeedBytesPerSec !== null ? formatSpeed(filteredAvgSpeedBytesPerSec) : '--' }}
+						</span>
+					</div>
 					<UTooltip text="复制当前列表链接">
 						<UButton
 							icon="i-heroicons-clipboard-document-list"
@@ -215,6 +336,115 @@
 							@click="retryAll"
 						/>
 					</UTooltip>
+					<UPopover v-model:open="advancedFilterOpen" :ui="{ content: 'p-0!' }">
+						<UTooltip text="高级筛选">
+							<UButton
+								icon="i-heroicons-funnel"
+								:color="isAdvancedFilterActive ? 'primary' : 'neutral'"
+								:variant="isAdvancedFilterActive ? 'soft' : 'ghost'"
+								size="xs"
+							/>
+						</UTooltip>
+						<template #content>
+							<div class="w-[min(92vw,420px)]">
+								<div class="px-3 py-2 border-b border-gray-100 dark:border-gray-800">
+									<div class="text-sm font-medium text-gray-900 dark:text-white">
+										高级筛选
+									</div>
+									<div class="text-[10px] text-gray-500 mt-0.5">
+										基于站点/响应 Header/状态码/最终 URL 等信息过滤当前列表。
+									</div>
+								</div>
+								<div class="p-3 space-y-3">
+									<div v-if="runAllSites && sitesList.length > 1" class="grid grid-cols-1 gap-3">
+										<UFormField label="站点" help="留空代表不过滤站点">
+											<UInputMenu
+												v-model="filterSiteId"
+												:items="siteFilterItems"
+												value-key="value"
+												open-on-focus
+												placeholder="全部站点"
+											/>
+										</UFormField>
+									</div>
+									<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+										<UFormField label="Header 名称" help="例如：cache-control / cf-cache-status">
+											<UInputMenu
+												v-model="filterHeaderName"
+												:items="headerNameItems"
+												:create-item="trimText(filterHeaderName).length > 0"
+												open-on-focus
+												placeholder="header name"
+												@create="onCreateHeaderName"
+											/>
+										</UFormField>
+										<UFormField label="Header 值包含" help="可留空，只按名称过滤">
+											<UInputMenu
+												v-model="filterHeaderValue"
+												:items="headerValueItems"
+												:create-item="trimText(filterHeaderValue).length > 0"
+												open-on-focus
+												placeholder="contains..."
+												@create="onCreateHeaderValue"
+											/>
+										</UFormField>
+									</div>
+									<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+										<UFormField label="HTTP 状态码" help="例如：200 / 403（留空不限制）">
+											<UInputMenu
+												v-model="filterHttpStatusText"
+												:items="httpStatusItems"
+												:create-item="trimText(filterHttpStatusText).length > 0"
+												open-on-focus
+												placeholder="200"
+												@create="onCreateHttpStatus"
+											/>
+										</UFormField>
+										<UFormField label="最终 URL 包含" help="例如：cdn.example.com">
+											<UInputMenu
+												v-model="filterFinalUrl"
+												:items="finalUrlItems"
+												:create-item="trimText(filterFinalUrl).length > 0"
+												open-on-focus
+												placeholder="contains..."
+												@create="onCreateFinalUrl"
+											/>
+										</UFormField>
+									</div>
+									<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+										<UFormField label="平均速度 ≥ (MB/s)" help="按单文件平均速度过滤（留空不限制）">
+											<UInputMenu
+												v-model="filterAvgSpeedMinText"
+												:items="avgSpeedItems"
+												:create-item="trimText(filterAvgSpeedMinText).length > 0"
+												open-on-focus
+												placeholder="0.5"
+												@create="onCreateAvgSpeedMin"
+											/>
+										</UFormField>
+										<UFormField label="平均速度 ≤ (MB/s)" help="留空不限制">
+											<UInputMenu
+												v-model="filterAvgSpeedMaxText"
+												:items="avgSpeedItems"
+												:create-item="trimText(filterAvgSpeedMaxText).length > 0"
+												open-on-focus
+												placeholder=""
+												@create="onCreateAvgSpeedMax"
+											/>
+										</UFormField>
+									</div>
+									<div class="flex justify-end gap-2 pt-1">
+										<UButton color="neutral" variant="ghost" size="sm" @click="resetAdvancedFilter">
+											清空
+										</UButton>
+										<UButton color="primary" size="sm" @click="advancedFilterOpen = false">
+											完成
+										</UButton>
+									</div>
+								</div>
+							</div>
+						</template>
+					</UPopover>
 				</div>
 			</div>
 
@@ -237,7 +467,20 @@
 						正在扫描目录
 					</div>
 					<div class="text-sm text-gray-500 truncate font-mono bg-gray-50 dark:bg-gray-800 py-2 px-4 rounded-lg border border-gray-100 dark:border-gray-800">
-						{{ crawlStats.current_path || '准备中...' }}
+						<div class="flex items-center gap-2 min-w-0">
+							<UBadge
+								v-if="runAllSites && sitesList.length > 1"
+								color="neutral"
+								variant="subtle"
+								size="xs"
+								class="shrink-0"
+							>
+								{{ getSiteById(crawlStats.siteId)?.name || '未知站点' }}
+							</UBadge>
+							<span class="truncate">
+								{{ crawlStats.current_path || '准备中...' }}
+							</span>
+						</div>
 					</div>
 					<div class="text-sm text-gray-400">
 						已发现 <span class="text-gray-900 dark:text-white font-medium">{{ crawlStats.found_files }}</span> 个文件
@@ -262,11 +505,11 @@
 
 			<!-- File List -->
 			<UScrollArea v-else class="flex-1 bg-white dark:bg-gray-900 p-4">
-				<div v-for="file in filteredFiles" :key="file.path" class="group relative mb-3 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-500/50 transition-colors shadow-sm last:mb-0 overflow-hidden" @contextmenu.prevent="showContextMenu($event, file)">
+				<div v-for="file in filteredFiles" :key="fileKey(file)" class="group relative mb-3 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-800 rounded-lg hover:border-primary-500/50 transition-colors shadow-sm last:mb-0 overflow-hidden" @contextmenu.prevent="showContextMenu($event, file)">
 					<!-- Background Progress -->
 					<div
 						class="absolute inset-0 bg-primary-50 dark:bg-primary-900/10 transition-all duration-300 ease-linear pointer-events-none"
-						:style="{ width: fileStates[file.path]?.status === 'done' ? '100%' : `${(fileStates[file.path]?.bytesRead ?? 0) / file.size * 100}%` }"
+						:style="{ width: stateOf(file)?.status === 'done' ? '100%' : `${(stateOf(file)?.bytesRead ?? 0) / file.size * 100}%` }"
 					/>
 
 					<div class="relative p-4 flex items-center gap-3 z-10">
@@ -285,23 +528,32 @@
 										{{ file.path.split('/').pop() }}
 									</div>
 									<UBadge
-										v-if="fileStates[file.path]"
-										:color="getStatusColor(fileStates[file.path]?.status)"
+										v-if="runAllSites && sitesList.length > 1"
+										color="neutral"
 										variant="subtle"
 										size="xs"
 										class="shrink-0"
 									>
-										{{ getStatusLabel(fileStates[file.path]?.status) }}
+										{{ getSiteById(file.siteId)?.name || '未知站点' }}
+									</UBadge>
+									<UBadge
+										v-if="stateOf(file)"
+										:color="getStatusColor(stateOf(file)?.status)"
+										variant="subtle"
+										size="xs"
+										class="shrink-0"
+									>
+										{{ getStatusLabel(stateOf(file)?.status) }}
 									</UBadge>
 								</div>
 
 								<div class="flex items-center gap-3 text-xs shrink-0 tabular-nums">
-									<template v-if="fileStates[file.path]?.status === 'running'">
+									<template v-if="stateOf(file)?.status === 'running'">
 										<span class="font-mono text-primary-500 font-medium">
-											{{ formatSpeed(fileStates[file.path]?.speed || 0) }}
+											{{ formatSpeed(stateOf(file)?.speed || 0) }}
 										</span>
 										<span class="text-gray-400">
-											{{ formatDuration(fileStates[file.path]?.eta || 0) }}
+											{{ formatDuration(stateOf(file)?.eta || 0) }}
 										</span>
 									</template>
 								</div>
@@ -314,10 +566,10 @@
 
 								<div class="flex items-center gap-2 shrink-0">
 									<div class="text-[10px] text-gray-500 tabular-nums">
-										{{ formatBytes(fileStates[file.path]?.bytesRead || 0) }} / {{ formatBytes(file.size) }}
+										{{ formatBytes(stateOf(file)?.bytesRead || 0) }} / {{ formatBytes(file.size) }}
 									</div>
 									<UButton
-										v-if="fileStates[file.path]?.status === 'failed'"
+										v-if="stateOf(file)?.status === 'failed'"
 										icon="i-heroicons-arrow-path"
 										size="xs"
 										color="primary"
@@ -328,8 +580,8 @@
 								</div>
 							</div>
 
-							<div v-if="fileStates[file.path]?.error" class="mt-1.5 text-xs text-red-500 truncate bg-red-50 dark:bg-red-900/10 px-2 py-0.5 rounded inline-block">
-								{{ fileStates[file.path]?.error }}
+							<div v-if="stateOf(file)?.error" class="mt-1.5 text-xs text-red-500 truncate bg-red-50 dark:bg-red-900/10 px-2 py-0.5 rounded inline-block">
+								{{ stateOf(file)?.error }}
 							</div>
 						</div>
 					</div>
@@ -439,6 +691,13 @@
 								</div>
 
 								<div class="text-gray-500">
+									平均速度
+								</div>
+								<div class="text-xs font-mono tabular-nums">
+									{{ detailsAvgSpeed ? formatSpeed(detailsAvgSpeed) : '-' }}
+								</div>
+
+								<div class="text-gray-500">
 									Attempt
 								</div>
 								<div class="text-xs font-mono tabular-nums">
@@ -490,7 +749,13 @@
 
 	const toast = useToast();
 
+	const STORAGE_SINGLE_KEY = "site_settings";
+	const STORAGE_LIST_KEY = "site_settings_list";
+	const STORAGE_ACTIVE_KEY = "site_settings_active_id";
+
 	const siteSettings = ref<SiteSettings | null>(null);
+	const sitesList = ref<SiteSettings[]>([]);
+	const activeSiteId = ref<string>("");
 	const files = ref<FileItem[]>([]);
 	const crawling = ref(false);
 	const running = ref(false);
@@ -498,11 +763,21 @@
 	const runId = ref<string | null>(null);
 	const backendSpeed = ref<number | null>(null);
 
+	const runScope = ref<"active" | "all">("all");
+	const runAllSites = computed(() => runScope.value === "all");
+
 	const runSettings = ref<RunSettings>({
 		minConn: 5,
 		maxConn: 32,
 		rateLimitBytesPerSec: 10 * 1024 * 1024 // 10MB/s
 	});
+
+	const settingsAccordionItems = [
+		{ label: "站点设置", slot: "site-settings", value: "site-settings" },
+		{ label: "运行设置", slot: "run-settings", value: "run-settings" },
+		{ label: "高级设置", slot: "advanced", value: "advanced" }
+	];
+	const settingsAccordionDefault = ["site-settings"];
 
 	const rateLimitMB = computed({
 		get: () => runSettings.value.rateLimitBytesPerSec ? runSettings.value.rateLimitBytesPerSec / (1024 * 1024) : 0,
@@ -513,6 +788,7 @@
 
 	// Crawl stats
 	const crawlStats = ref({
+		siteId: "",
 		scanned_dirs: 0,
 		total_dirs: 0,
 		found_files: 0,
@@ -537,10 +813,212 @@
 		speed: number
 		eta: number
 		lastUpdate: number
+		startedAt?: number
 	}
 
 	const fileStates = ref<Record<string, ExtendedFileState>>({});
 	const selectedTab = ref("all");
+	const busy = computed(() => running.value || crawling.value || stopping.value);
+	const siteFieldsOpen = ref(false);
+
+	function newEphemeralSiteId() {
+		try {
+			return crypto.randomUUID();
+		} catch {
+			return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+		}
+	}
+
+	function ensureSiteId(s: SiteSettings): SiteSettings {
+		if (s.id && String(s.id).length > 0) return s;
+		return { ...s, id: newEphemeralSiteId() };
+	}
+
+	function loadSitesFromStorage() {
+		let list: SiteSettings[] = [];
+		const listRaw = localStorage.getItem(STORAGE_LIST_KEY);
+		if (listRaw) {
+			try {
+				const parsed = JSON.parse(listRaw) as SiteSettings[];
+				if (Array.isArray(parsed) && parsed.length > 0) {
+					list = parsed.map(ensureSiteId);
+				}
+			} catch {
+				// ignore
+			}
+		}
+
+		if (list.length === 0) {
+			const singleRaw = localStorage.getItem(STORAGE_SINGLE_KEY);
+			if (singleRaw) {
+				try {
+					const single = ensureSiteId(JSON.parse(singleRaw) as SiteSettings);
+					list = [single];
+				} catch {
+					// ignore
+				}
+			}
+		}
+
+		const activeIdRaw = localStorage.getItem(STORAGE_ACTIVE_KEY);
+		const active = (activeIdRaw && list.length > 0)
+			? (list.find((s) => s.id === activeIdRaw) ?? list[0]!)
+			: (list[0] ?? {
+				id: "",
+				name: "Default",
+				apiBaseUrl: "",
+				token: "",
+				startPath: "/",
+				proxyUrl: "",
+				userAgent: "",
+				cookie: "",
+				dirPassword: "",
+				downloadBaseUrl: "",
+				followRedirects: true
+			});
+
+		return {
+			list,
+			activeId: active.id,
+			active
+		};
+	}
+
+	function persistActiveSite(next: SiteSettings) {
+		// 兼容旧逻辑：始终写入单站点 key（供其他页面/旧逻辑读取）
+		localStorage.setItem(STORAGE_SINGLE_KEY, JSON.stringify(next));
+
+		// 写入 active id
+		if (next.id) localStorage.setItem(STORAGE_ACTIVE_KEY, next.id);
+
+		// 新多站点列表（若存在则更新）
+		const listRaw = localStorage.getItem(STORAGE_LIST_KEY);
+		if (!listRaw) return;
+		try {
+			const list = JSON.parse(listRaw) as SiteSettings[];
+			if (!Array.isArray(list) || list.length === 0) return;
+			const idx = list.findIndex((s) => s.id === next.id);
+			if (idx >= 0) {
+				list[idx] = { ...list[idx], ...next };
+				localStorage.setItem(STORAGE_LIST_KEY, JSON.stringify(list));
+				sitesList.value = list;
+				activeSiteId.value = next.id;
+			}
+		} catch {
+			// ignore
+		}
+	}
+
+	function formatSiteHint(s: Pick<SiteSettings, "apiBaseUrl" | "startPath">) {
+		const base = (s.apiBaseUrl || "").replace(/\/+$/, "");
+		const start = (s.startPath || "/").trim() || "/";
+		return `${base}${start}`;
+	}
+
+	const effectiveSitesList = computed(() => {
+		const list = [...sitesList.value];
+		const active = siteSettings.value;
+		if (!active) return list;
+		const idx = list.findIndex((s) => s.id === active.id);
+		if (idx >= 0) list[idx] = { ...list[idx], ...active };
+		return list;
+	});
+
+	function getSiteById(id: string | undefined | null) {
+		if (!id) return siteSettings.value;
+		return effectiveSitesList.value.find((s) => s.id === id) ?? siteSettings.value;
+	}
+
+	function buildDownloadUrlForFile(file: Pick<FileItem, "path" | "siteId">) {
+		const settings = getSiteById(file.siteId);
+		if (!settings) return "";
+		const base = (settings.downloadBaseUrl || settings.apiBaseUrl).replace(/\/+$/, "");
+		const encodedPath = file.path.split("/").map((p) => encodeURIComponent(p)).join("/");
+		return `${base}/d${encodedPath}`;
+	}
+
+	type SiteSettingsPatch = Partial<Omit<SiteSettings, "id" | "name" | "apiBaseUrl" | "startPath">>;
+
+	function patchSiteInStorage(siteId: string, patch: SiteSettingsPatch) {
+		// update localStorage list
+		try {
+			const raw = localStorage.getItem(STORAGE_LIST_KEY);
+			if (raw) {
+				const list = JSON.parse(raw) as SiteSettings[];
+				if (Array.isArray(list) && list.length > 0) {
+					const idx = list.findIndex((s) => s.id === siteId);
+					if (idx >= 0) {
+						const prev = list[idx];
+						if (prev) {
+							list[idx] = { ...prev, ...patch };
+						}
+						localStorage.setItem(STORAGE_LIST_KEY, JSON.stringify(list));
+						sitesList.value = list;
+					}
+				}
+			}
+		} catch {
+			// ignore
+		}
+
+		// update active site in memory + single key for backward compatibility
+		if (siteSettings.value?.id === siteId) {
+			siteSettings.value = { ...siteSettings.value, ...patch };
+			localStorage.setItem(STORAGE_SINGLE_KEY, JSON.stringify(siteSettings.value));
+		}
+	}
+
+	function resetForNewSite() {
+		files.value = [];
+		fileStates.value = {};
+		selectedTab.value = "all";
+		backendSpeed.value = null;
+		stats.value = { total: 0, done: 0, failed: 0, bytes: 0, speed: 0 };
+		crawlStats.value = { siteId: "", scanned_dirs: 0, total_dirs: 0, found_files: 0, current_path: "", speed: 0, eta: 0 };
+		crawlLastUpdateTime = 0;
+		crawlLastScannedDirs = 0;
+		crawlSpeedEma = 0;
+	}
+
+	function selectActiveSite(id: string) {
+		if (busy.value) {
+			toast.add({ title: "运行/扫描中无法切换站点", color: "warning" });
+			return;
+		}
+		if (!id) return;
+		let picked = sitesList.value.find((s) => s.id === id);
+		if (!picked) {
+			const loaded = loadSitesFromStorage();
+			sitesList.value = loaded.list;
+			picked = loaded.list.find((s) => s.id === id);
+		}
+		if (!picked) return;
+
+		activeSiteId.value = picked.id;
+		siteSettings.value = { ...picked };
+		localStorage.setItem(STORAGE_ACTIVE_KEY, picked.id);
+		localStorage.setItem(STORAGE_SINGLE_KEY, JSON.stringify(picked));
+		resetForNewSite();
+		toast.add({ title: "已切换站点", color: "success" });
+	}
+
+	function normalizeSiteId(siteId: string | undefined | null) {
+		// 兼容旧事件/旧扫描结果：如果没有 siteId，则回退到当前页面选择的站点。
+		return (siteId && siteId.length > 0) ? siteId : (siteSettings.value?.id || "");
+	}
+
+	function fileKey(file: Pick<FileItem, "path" | "siteId">) {
+		return `${normalizeSiteId(file.siteId)}:${file.path}`;
+	}
+
+	function updateKey(update: Pick<FileUpdate, "path" | "siteId">) {
+		return `${normalizeSiteId(update.siteId)}:${update.path}`;
+	}
+
+	function stateOf(file: Pick<FileItem, "path" | "siteId"> | null | undefined) {
+		if (!file) return undefined;
+		return fileStates.value[fileKey(file)];
+	}
 
 	const contextMenu = ref({
 		visible: false,
@@ -552,8 +1030,22 @@
 	const detailsOpen = ref(false);
 	const detailsFile = ref<FileItem | null>(null);
 	const detailsState = computed(() => {
-		if (!detailsFile.value) return undefined;
-		return fileStates.value[detailsFile.value.path];
+		return stateOf(detailsFile.value);
+	});
+	const detailsAvgSpeed = computed(() => {
+		const s = detailsState.value as (ExtendedFileState | undefined);
+		if (!s) return null;
+		const bytes = Number(s.bytesRead || 0);
+		if (bytes <= 0) return null;
+
+		let seconds = 0;
+		if (typeof s.durationMs === "number" && s.durationMs > 0) {
+			seconds = s.durationMs / 1000;
+		} else if (typeof s.startedAt === "number" && typeof s.lastUpdate === "number" && s.lastUpdate > s.startedAt) {
+			seconds = (s.lastUpdate - s.startedAt) / 1000;
+		}
+		if (seconds <= 0) return null;
+		return bytes / seconds;
 	});
 
 	function showContextMenu(e: MouseEvent, file: FileItem) {
@@ -579,12 +1071,9 @@
 
 	async function copyDownloadLink() {
 		const file = contextMenu.value.file;
-		const settings = siteSettings.value;
-		if (!file || !settings) return;
-
-		const base = (settings.downloadBaseUrl || settings.apiBaseUrl).replace(/\/+$/, "");
-		const encodedPath = file.path.split("/").map((p) => encodeURIComponent(p)).join("/");
-		const url = `${base}/d${encodedPath}`;
+		if (!file) return;
+		const url = buildDownloadUrlForFile(file);
+		if (!url) return;
 
 		try {
 			await navigator.clipboard.writeText(url);
@@ -610,27 +1099,248 @@
 
 	const tabItems = computed(() => [
 		{ label: `全部 (${files.value.length})`, value: "all" },
-		{ label: `进行中 (${files.value.filter((f) => fileStates.value[f.path]?.status === "running").length})`, value: "running" },
-		{ label: `已完成 (${files.value.filter((f) => fileStates.value[f.path]?.status === "done").length})`, value: "done" },
-		{ label: `失败 (${files.value.filter((f) => fileStates.value[f.path]?.status === "failed").length})`, value: "failed" }
+		{ label: `进行中 (${files.value.filter((f) => stateOf(f)?.status === "running").length})`, value: "running" },
+		{ label: `已完成 (${files.value.filter((f) => stateOf(f)?.status === "done").length})`, value: "done" },
+		{ label: `失败 (${files.value.filter((f) => stateOf(f)?.status === "failed").length})`, value: "failed" }
 	]);
 
+	const advancedFilterOpen = ref(false);
+	const filterSiteId = ref("");
+	const filterHeaderName = ref("");
+	const filterHeaderValue = ref("");
+	const filterHttpStatusText = ref("");
+	const filterFinalUrl = ref("");
+	const filterAvgSpeedMinText = ref("");
+	const filterAvgSpeedMaxText = ref("");
+	function trimText(v: unknown) {
+		return String(v ?? "").trim();
+	}
+
+	const isAdvancedFilterActive = computed(() => Boolean(trimText(filterSiteId.value) || trimText(filterHeaderName.value) || trimText(filterHeaderValue.value) || trimText(filterHttpStatusText.value) || trimText(filterFinalUrl.value) || trimText(filterAvgSpeedMinText.value) || trimText(filterAvgSpeedMaxText.value)));
+
+	function resetAdvancedFilter() {
+		filterSiteId.value = "";
+		filterHeaderName.value = "";
+		filterHeaderValue.value = "";
+		filterHttpStatusText.value = "";
+		filterFinalUrl.value = "";
+		filterAvgSpeedMinText.value = "";
+		filterAvgSpeedMaxText.value = "";
+	}
+
+	function onCreateHeaderName(v: string) {
+		filterHeaderName.value = v;
+	}
+
+	function onCreateHeaderValue(v: string) {
+		filterHeaderValue.value = v;
+	}
+
+	function onCreateHttpStatus(v: string) {
+		filterHttpStatusText.value = v;
+	}
+
+	function onCreateFinalUrl(v: string) {
+		filterFinalUrl.value = v;
+	}
+
+	function onCreateAvgSpeedMin(v: string) {
+		filterAvgSpeedMinText.value = v;
+	}
+
+	function onCreateAvgSpeedMax(v: string) {
+		filterAvgSpeedMaxText.value = v;
+	}
+
+	const baseTabFilteredFiles = computed(() => {
+		if (selectedTab.value === "all") return files.value;
+		return files.value.filter((f) => {
+			const status = stateOf(f)?.status;
+			if (selectedTab.value === "running") return status === "running";
+			if (selectedTab.value === "done") return status === "done";
+			if (selectedTab.value === "failed") return status === "failed";
+			return false;
+		});
+	});
+
+	const siteFilterItems = computed(() => {
+		// 注意：Combobox 的空字符串 value 用于“清空选择/显示 placeholder”，
+		// 因此 items 里不能出现 value === ""，否则会触发 ComboboxItem 报错。
+		const items: Array<{ label: string, value: string, description?: string }> = [];
+		for (const s of sitesList.value) {
+			const sid = String(s.id || "").trim();
+			if (!sid) continue;
+			items.push({
+				label: s.name || "未命名站点",
+				value: sid,
+				description: formatSiteHint(s)
+			});
+		}
+		return items;
+	});
+
+	const suggestionFiles = computed(() => {
+		let list = baseTabFilteredFiles.value;
+		const sid = trimText(filterSiteId.value);
+		if (runAllSites.value && sid) {
+			list = list.filter((f) => String(f.siteId || "") === sid);
+		}
+		return list;
+	});
+
+	const headerNameItems = computed(() => {
+		const set = new Set<string>();
+		for (const f of suggestionFiles.value) {
+			const s = stateOf(f);
+			const headers = s?.responseHeaders || [];
+			for (const h of headers) {
+				const name = String((h as any).name || "").trim();
+				if (!name) continue;
+				set.add(name.toLowerCase());
+			}
+		}
+		return Array.from(set).sort();
+	});
+
+	const headerValueItems = computed(() => {
+		const nameNeedle = trimText(filterHeaderName.value).toLowerCase();
+		if (!nameNeedle) return [];
+		const set = new Set<string>();
+		for (const f of suggestionFiles.value) {
+			const s = stateOf(f);
+			const headers = s?.responseHeaders || [];
+			for (const h of headers) {
+				const hn = String((h as any).name || "").trim().toLowerCase();
+				if (!hn || !hn.includes(nameNeedle)) continue;
+				const hv = String((h as any).value || "").trim();
+				if (!hv) continue;
+				set.add(hv);
+				if (set.size >= 50) break;
+			}
+			if (set.size >= 50) break;
+		}
+		return Array.from(set).sort();
+	});
+
+	const httpStatusItems = computed(() => {
+		const common = ["200", "206", "301", "302", "304", "400", "401", "403", "404", "409", "416", "429", "500", "502", "503", "504"];
+		const set = new Set<string>(common);
+		for (const f of suggestionFiles.value) {
+			const s = stateOf(f);
+			const n = Number((s as any)?.httpStatus);
+			if (!Number.isFinite(n) || n <= 0) continue;
+			set.add(String(Math.trunc(n)));
+			if (set.size >= 40) break;
+		}
+		return Array.from(set).sort((a, b) => (Number(a) || 0) - (Number(b) || 0));
+	});
+
+	const finalUrlItems = computed(() => {
+		const set = new Set<string>();
+		for (const f of suggestionFiles.value) {
+			const s = stateOf(f);
+			const raw = String((s as any)?.finalUrl || "").trim();
+			if (!raw) continue;
+			try {
+				const u = new URL(raw);
+				if (u.host) set.add(u.host);
+			} catch {
+				// ignore invalid url
+			}
+			if (set.size >= 50) break;
+		}
+		return Array.from(set).sort();
+	});
+
+	const avgSpeedItems = computed(() => ["0.1", "0.2", "0.5", "1", "2", "5", "10", "20", "50"]);
+
+	function avgSpeedBytesPerSecOfState(s: ExtendedFileState | undefined) {
+		if (!s) return null;
+		const bytes = Number(s.bytesRead || 0);
+		if (bytes <= 0) return null;
+
+		let seconds = 0;
+		if (typeof s.durationMs === "number" && s.durationMs > 0) {
+			seconds = s.durationMs / 1000;
+		} else if (typeof s.startedAt === "number" && typeof s.lastUpdate === "number" && s.lastUpdate > s.startedAt) {
+			seconds = (s.lastUpdate - s.startedAt) / 1000;
+		}
+		if (seconds <= 0) return null;
+		return bytes / seconds;
+	}
+
 	const filteredFiles = computed(() => {
-		let list = files.value;
-		if (selectedTab.value !== "all") {
-			list = files.value.filter((f) => {
-				const status = fileStates.value[f.path]?.status;
-				if (selectedTab.value === "running") return status === "running";
-				if (selectedTab.value === "done") return status === "done";
-				if (selectedTab.value === "failed") return status === "failed";
-				return false;
+		let list = baseTabFilteredFiles.value;
+
+		// Advanced filters (Site / Header / HTTP status / Final URL)
+		const siteNeedle = trimText(filterSiteId.value);
+		const headerName = trimText(filterHeaderName.value).toLowerCase();
+		const headerValue = trimText(filterHeaderValue.value).toLowerCase();
+		const finalUrlNeedle = trimText(filterFinalUrl.value).toLowerCase();
+		const httpStatusNeedle = (() => {
+			const raw = trimText(filterHttpStatusText.value);
+			if (!raw) return null;
+			const n = Number.parseInt(raw, 10);
+			return Number.isFinite(n) ? n : null;
+		})();
+		const avgMinBytesPerSec = (() => {
+			const raw = trimText(filterAvgSpeedMinText.value);
+			if (!raw) return null;
+			const mb = Number.parseFloat(raw);
+			return Number.isFinite(mb) ? mb * 1024 * 1024 : null;
+		})();
+		const avgMaxBytesPerSec = (() => {
+			const raw = trimText(filterAvgSpeedMaxText.value);
+			if (!raw) return null;
+			const mb = Number.parseFloat(raw);
+			return Number.isFinite(mb) ? mb * 1024 * 1024 : null;
+		})();
+
+		if (runAllSites.value && siteNeedle) {
+			list = list.filter((f) => String(f.siteId || "") === siteNeedle);
+		}
+
+		if (headerName || headerValue || finalUrlNeedle || httpStatusNeedle !== null || avgMinBytesPerSec !== null || avgMaxBytesPerSec !== null) {
+			list = list.filter((f) => {
+				const s = stateOf(f);
+				if (!s) return false;
+
+				if (httpStatusNeedle !== null) {
+					if (Number(s.httpStatus || 0) !== httpStatusNeedle) return false;
+				}
+
+				if (finalUrlNeedle) {
+					const hay = String(s.finalUrl || "").toLowerCase();
+					if (!hay.includes(finalUrlNeedle)) return false;
+				}
+
+				if (headerName || headerValue) {
+					const headers = s.responseHeaders || [];
+					const ok = headers.some((h) => {
+						const hn = String(h.name || "").toLowerCase();
+						const hv = String(h.value || "").toLowerCase();
+						if (headerName && !hn.includes(headerName)) return false;
+						if (headerValue && !hv.includes(headerValue)) return false;
+						return true;
+					});
+					if (!ok) return false;
+				}
+
+				if (avgMinBytesPerSec !== null || avgMaxBytesPerSec !== null) {
+					const v = avgSpeedBytesPerSecOfState(s as any);
+					if (v === null) return false;
+					if (avgMinBytesPerSec !== null && v < avgMinBytesPerSec) return false;
+					if (avgMaxBytesPerSec !== null && v > avgMaxBytesPerSec) return false;
+				}
+
+				return true;
 			});
 		}
 
 		// Sort: Running > Failed > Queued > Done
 		return [...list].sort((a, b) => {
-			const statusA = fileStates.value[a.path]?.status;
-			const statusB = fileStates.value[b.path]?.status;
+			const statusA = stateOf(a)?.status;
+			const statusB = stateOf(b)?.status;
 
 			const getPriority = (s: string | undefined) => {
 				if (s === "running") return 0;
@@ -643,15 +1353,42 @@
 		});
 	});
 
-	async function copyAllLinks() {
-		const settings = siteSettings.value;
-		if (!settings) return;
+	const filteredAvgSpeedBytesPerSec = computed(() => {
+		let totalBytes = 0;
+		let totalSeconds = 0;
+		for (const f of filteredFiles.value) {
+			const s = stateOf(f) as (ExtendedFileState | undefined);
+			if (!s) continue;
 
-		const base = (settings.downloadBaseUrl || settings.apiBaseUrl).replace(/\/+$/, "");
-		const links = filteredFiles.value.map((file) => {
-			const encodedPath = file.path.split("/").map((p) => encodeURIComponent(p)).join("/");
-			return `${base}/d${encodedPath}`;
-		});
+			// 总大小：已完成/失败取文件 size；运行中取 bytesRead（并限制不超过 size）
+			let bytes = 0;
+			if (s.status === "done" || s.status === "failed") {
+				bytes = Number(f.size || 0);
+			} else {
+				bytes = Number(s.bytesRead || 0);
+				const cap = Number(f.size || 0);
+				if (cap > 0) bytes = Math.min(bytes, cap);
+			}
+			if (!Number.isFinite(bytes) || bytes <= 0) continue;
+
+			// 总时间：优先 durationMs；否则用 startedAt ~ lastUpdate
+			let seconds = 0;
+			if (typeof s.durationMs === "number" && s.durationMs > 0) {
+				seconds = s.durationMs / 1000;
+			} else if (typeof s.startedAt === "number" && typeof s.lastUpdate === "number" && s.lastUpdate > s.startedAt) {
+				seconds = (s.lastUpdate - s.startedAt) / 1000;
+			}
+			if (!Number.isFinite(seconds) || seconds <= 0) continue;
+
+			totalBytes += bytes;
+			totalSeconds += seconds;
+		}
+		if (totalBytes <= 0 || totalSeconds <= 0) return null;
+		return totalBytes / totalSeconds;
+	});
+
+	async function copyAllLinks() {
+		const links = filteredFiles.value.map((file) => buildDownloadUrlForFile(file)).filter(Boolean);
 
 		if (links.length === 0) {
 			toast.add({ title: "列表为空", color: "warning" });
@@ -667,7 +1404,7 @@
 	}
 
 	async function retryAll() {
-		const toRetry = files.value.filter((f) => fileStates.value[f.path]?.status === "failed");
+		const toRetry = files.value.filter((f) => stateOf(f)?.status === "failed");
 		const count = toRetry.length;
 
 		if (count === 0) {
@@ -687,9 +1424,7 @@
 
 		// Reset UI state for retried files (backend will re-emit updates)
 		toRetry.forEach((f) => {
-			if (fileStates.value[f.path]) {
-				delete fileStates.value[f.path];
-			}
+			delete fileStates.value[fileKey(f)];
 		});
 		stats.value.failed = Math.max(0, stats.value.failed - count);
 
@@ -705,7 +1440,7 @@
 		// Calculate effective read bytes for progress
 		// If done or failed, count full size. If running, count bytesRead.
 		const effectiveRead = files.value.reduce((acc, f) => {
-			const state = fileStates.value[f.path];
+			const state = stateOf(f);
 			if (!state) return acc;
 			if (state.status === "done" || state.status === "failed") {
 				return acc + f.size;
@@ -730,29 +1465,13 @@
 	});
 
 	onMounted(async () => {
-		const saved = localStorage.getItem("site_settings");
-		if (!saved) {
-			siteSettings.value = {
-				id: "",
-				name: "Default",
-				apiBaseUrl: "",
-				token: "",
-				startPath: "/",
-				proxyUrl: "",
-				userAgent: "",
-				cookie: "",
-				dirPassword: "",
-				downloadBaseUrl: "",
-				followRedirects: true
-			};
-		} else {
-			siteSettings.value = JSON.parse(saved);
-		}
+		const loaded = loadSitesFromStorage();
+		sitesList.value = loaded.list;
+		activeSiteId.value = loaded.activeId;
+		siteSettings.value = { ...loaded.active };
 
 		watch(siteSettings, (newVal) => {
-			if (newVal) {
-				localStorage.setItem("site_settings", JSON.stringify(newVal));
-			}
+			if (newVal) persistActiveSite(newVal);
 		}, { deep: true });
 
 		// Listen for updates
@@ -775,6 +1494,7 @@
 			const scannedDirs = Number(payload.scanned_dirs || 0);
 			const totalDirs = Number(payload.total_dirs || 0);
 			const remaining = Math.max(0, totalDirs - scannedDirs);
+			const sid = payload.siteId ? String(payload.siteId) : (siteSettings.value?.id || "");
 
 			// Instantaneous speed based on delta progress
 			let instSpeed = 0;
@@ -804,6 +1524,7 @@
 
 			crawlStats.value = {
 				...payload,
+				siteId: sid,
 				speed,
 				eta
 			};
@@ -811,10 +1532,21 @@
 
 		// Listen for cookie updates from crawler
 		await listen("site:cookie_updated", (event: any) => {
-			const settings = siteSettings.value;
-			if (settings) {
-				settings.cookie = event.payload.cookie;
-				localStorage.setItem("site_settings", JSON.stringify(settings));
+			const payload = event.payload || {};
+			const sid = String(payload.siteId || "");
+			const cookie = payload.cookie;
+			const ua = payload.userAgent;
+			if (sid) {
+				patchSiteInStorage(sid, {
+					cookie: typeof cookie === "string" ? cookie : undefined,
+					userAgent: typeof ua === "string" ? ua : undefined
+				});
+				toast.add({ title: "Cookie 已更新", color: "info" });
+				return;
+			}
+			// legacy payload without siteId -> fall back to current site
+			if (siteSettings.value && typeof cookie === "string") {
+				siteSettings.value.cookie = cookie;
 				toast.add({ title: "Cookie 已更新", color: "info" });
 			}
 		});
@@ -828,10 +1560,15 @@
 		await listen<FileUpdate>("run:fileUpdate", (event) => {
 			const update = event.payload;
 			const now = Date.now();
+			const key = updateKey(update);
 
-			const oldState = fileStates.value[update.path];
+			const oldState = fileStates.value[key];
 			let speed = 0;
 			let eta = 0;
+			let startedAt = oldState?.startedAt;
+			if (!startedAt && update.status === "running") {
+				startedAt = now;
+			}
 
 			if (oldState && update.status === "running") {
 				const timeDiff = (now - oldState.lastUpdate) / 1000;
@@ -850,7 +1587,7 @@
 				}
 
 				// Find file size
-				const file = files.value.find((f) => f.path === update.path);
+				const file = files.value.find((f) => fileKey(f) === key);
 				if (file && speed > 0) {
 					eta = (file.size - update.bytesRead) / speed;
 				}
@@ -859,17 +1596,18 @@
 				speed = 0;
 			}
 
-			fileStates.value[update.path] = {
+			fileStates.value[key] = {
 				...(oldState || {}),
 				...update,
 				speed: update.status === "running" ? speed : 0,
 				eta: update.status === "running" ? eta : 0,
-				lastUpdate: now
+				lastUpdate: now,
+				startedAt
 			} as ExtendedFileState;
 
 			if (update.status === "done") {
 				// Fix progress calculation: update file size to actual bytes read
-				const file = files.value.find((f) => f.path === update.path);
+				const file = files.value.find((f) => fileKey(f) === key);
 				if (file) {
 					file.size = update.bytesRead;
 				}
@@ -897,6 +1635,9 @@
 	async function startCrawl() {
 		const settings = siteSettings.value;
 		if (!settings) return;
+		if (runAllSites.value && effectiveSitesList.value.length <= 1) {
+			runScope.value = "active";
+		}
 
 		crawling.value = true;
 		crawlLastUpdateTime = 0;
@@ -905,7 +1646,9 @@
 		files.value = [];
 		stats.value = { total: 0, done: 0, failed: 0, bytes: 0, speed: 0 };
 		try {
-			const result = await invoke<FileItem[]>("crawl", { settings });
+			const result = runAllSites.value
+				? await invoke<FileItem[]>("crawl_multi", { settingsList: effectiveSitesList.value })
+				: await invoke<FileItem[]>("crawl", { settings });
 			files.value = result;
 			stats.value.total = result.length;
 			toast.add({ title: `发现 ${result.length} 个文件`, color: "success" });
@@ -918,10 +1661,13 @@
 
 	async function startRun() {
 		if (!siteSettings.value || files.value.length === 0) return;
+		if (runAllSites.value && effectiveSitesList.value.length <= 1) {
+			runScope.value = "active";
+		}
 
 		// Filter files that are not done
 		const filesToRun = files.value.filter((f) => {
-			const state = fileStates.value[f.path];
+			const state = stateOf(f);
 			return !state || state.status !== "done";
 		});
 
@@ -946,17 +1692,21 @@
 
 		// Remove old state for re-run files
 		filesToRun.forEach((f) => {
-			if (fileStates.value[f.path]) {
-				delete fileStates.value[f.path];
-			}
+			delete fileStates.value[fileKey(f)];
 		});
 
 		try {
-			const id = await invoke<string>("start_run", {
-				siteSettings: siteSettings.value,
-				runSettings: runSettings.value,
-				files: filesToRun
-			});
+			const id = runAllSites.value
+				? await invoke<string>("start_run_multi", {
+					siteSettingsList: effectiveSitesList.value,
+					runSettings: runSettings.value,
+					files: filesToRun
+				})
+				: await invoke<string>("start_run", {
+					siteSettings: siteSettings.value,
+					runSettings: runSettings.value,
+					files: filesToRun
+				});
 			runId.value = id;
 			toast.add({ title: "预热已开始", color: "success" });
 		} catch (e) {
@@ -966,7 +1716,7 @@
 	}
 
 	async function retryFile(file: FileItem) {
-		if (fileStates.value[file.path]?.status !== "failed") return;
+		if (stateOf(file)?.status !== "failed") return;
 
 		try {
 			await invoke("retry_files", { files: [file] });
@@ -978,7 +1728,7 @@
 		running.value = true;
 		stopping.value = false;
 
-		delete fileStates.value[file.path];
+		delete fileStates.value[fileKey(file)];
 		stats.value.failed = Math.max(0, stats.value.failed - 1);
 		toast.add({ title: "已提交重试", color: "info" });
 	}

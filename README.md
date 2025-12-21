@@ -124,4 +124,4 @@ bun run tauri:build
 
 ## License
 
-[MIT](./LICENSE)
+[MPL-2.0](./LICENSE)

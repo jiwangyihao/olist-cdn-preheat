@@ -30,6 +30,11 @@ export interface RunSettings {
 
 export interface FileItem {
 	id: string
+	/**
+	 * 属于哪个站点/分组（对应 SiteSettings.id）。
+	 * 旧版本/遗留数据可能不存在，因此保持可选。
+	 */
+	siteId?: string
 	path: string
 	name: string
 	size: number
@@ -40,6 +45,11 @@ export interface FileItem {
 
 export interface FileUpdate {
 	runId: string
+	/**
+	 * 属于哪个站点/分组（对应 SiteSettings.id）。
+	 * 旧版本/遗留事件可能不存在，因此保持可选。
+	 */
+	siteId?: string
 	path: string
 	status: "queued" | "running" | "done" | "failed" | "canceled"
 	attempt?: number

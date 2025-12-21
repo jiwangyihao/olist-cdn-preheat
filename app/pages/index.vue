@@ -8,8 +8,9 @@
 	const router = useRouter();
 
 	onMounted(() => {
-		const settings = localStorage.getItem("site_settings");
-		if (settings) {
+		const list = localStorage.getItem("site_settings_list");
+		const single = localStorage.getItem("site_settings");
+		if (list || single) {
 			router.replace("/preheat");
 		} else {
 			router.replace("/site");

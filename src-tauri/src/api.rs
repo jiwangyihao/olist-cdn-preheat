@@ -143,6 +143,7 @@ impl OpenListClient {
 
             FileItem {
                 id: uuid::Uuid::new_v4().to_string(), // Generate a temp ID
+                site_id: String::new(),
                 path: logical_path,
                 name: obj.name,
                 size: obj.size,

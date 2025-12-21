@@ -79,6 +79,9 @@ impl Default for RunSettings {
 #[serde(rename_all = "camelCase")]
 pub struct FileItem {
     pub id: String,
+    /// Which site/group this file belongs to (SiteSettings.id). Empty for legacy single-site payloads.
+    #[serde(default)]
+    pub site_id: String,
     pub path: String, // Logical path
     pub name: String,
     pub size: u64,
@@ -124,6 +127,9 @@ pub enum RunState {
 #[serde(rename_all = "camelCase")]
 pub struct FileUpdate {
     pub run_id: String,
+    /// Which site/group this update belongs to (SiteSettings.id). Empty for legacy single-site payloads.
+    #[serde(default)]
+    pub site_id: String,
     pub path: String,
     pub status: FileStatus,
     pub attempt: Option<u32>,

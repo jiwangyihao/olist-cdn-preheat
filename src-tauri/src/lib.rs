@@ -46,7 +46,9 @@ pub fn run() {
 		.plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::crawl,
+			commands::crawl_multi,
             commands::start_run,
+			commands::start_run_multi,
             commands::cancel_run,
             commands::retry_files
         ])

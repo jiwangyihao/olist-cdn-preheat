@@ -32,7 +32,7 @@
 		"devUrl": "http://localhost:3000"
 	},
 	"productName": "OpenList CDN Preheat",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"identifier": "top.jwyihao.olist-cdn-preheat",
 	"plugins": {},
 	"app": {

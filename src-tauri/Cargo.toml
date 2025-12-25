@@ -1,6 +1,6 @@
 [package]
 name = "olist-cdn-preheat"
-version = "0.1.0"
+version = "0.2.0"
 description = "OpenList CDN Preheat Desktop App"
 authors = [ "jiwangyihao" ]
 license = "MPL-2.0"

@@ -5,6 +5,9 @@ export interface SiteSettings {
 	downloadBaseUrl?: string
 	startPath: string
 	token?: string
+	authType?: 'token' | 'password'  // 认证方式，默认 'token'
+	username?: string                 // 账号（仅 password 模式使用）
+	userBasePath?: string             // 用户账号的 base 路径（如 /abc，用于修正下载 URL）
 	dirPassword?: string
 	proxyUrl?: string
 	userAgent?: string

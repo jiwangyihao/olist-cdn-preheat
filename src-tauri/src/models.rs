@@ -11,6 +11,9 @@ pub struct SiteSettings {
     pub download_base_url: Option<String>,
     pub start_path: String,
     pub token: Option<String>,
+    /// User account base path (e.g. "/abc") - prepended to file paths when constructing download URLs
+    #[serde(default)]
+    pub user_base_path: Option<String>,
     pub dir_password: Option<String>,
     pub proxy_url: Option<String>,
     pub user_agent: Option<String>,
@@ -28,6 +31,7 @@ impl Default for SiteSettings {
             download_base_url: None,
             start_path: "/".to_string(),
             token: None,
+            user_base_path: None,
             dir_password: None,
             proxy_url: None,
             user_agent: Some("olist-cdn-preheat/0.1 (Mozilla/5.0 compatible)".to_string()),

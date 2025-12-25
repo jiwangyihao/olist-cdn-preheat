@@ -1,9 +1,31 @@
 use crate::error::{AppError, AppResult};
 use crate::models::FileItem;
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use chrono::{DateTime, Utc};
+
+// ============ Login API Structures ============
+
+#[derive(Debug, Serialize)]
+struct LoginRequest {
+    username: String,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LoginResponse {
+    code: i32,
+    message: String,
+    data: Option<LoginData>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LoginData {
+    token: String,
+}
+
+// ============ File List API Structures ============
 
 #[derive(Debug, Deserialize)]
 struct FsListResponse {
@@ -155,4 +177,53 @@ impl OpenListClient {
 
         Ok((items, data.total))
     }
+}
+
+// ============ Standalone Login Function ============
+
+/// Login to OpenList with username and password, returns JWT token.
+/// This is a standalone function that doesn't require an OpenListClient instance.
+pub async fn login_with_password(
+    base_url: &str,
+    username: &str,
+    password: &str,
+    proxy_url: Option<&str>,
+) -> AppResult<String> {
+    let mut builder = Client::builder()
+        .timeout(std::time::Duration::from_secs(30));
+
+    if let Some(proxy) = proxy_url {
+        if !proxy.is_empty() {
+            builder = builder.proxy(reqwest::Proxy::all(proxy)?);
+        }
+    }
+
+    let client = builder.build()?;
+    let base_url = base_url.trim_end_matches('/');
+    let url = format!("{}/api/auth/login", base_url);
+
+    let body = LoginRequest {
+        username: username.to_string(),
+        password: password.to_string(),
+    };
+
+    let resp = client.post(&url).json(&body).send().await?;
+    let status = resp.status();
+
+    if !status.is_success() {
+        return Err(AppError::Api(format!("HTTP Error: {}", status)));
+    }
+
+    let text = resp.text().await?;
+    let json_resp: LoginResponse = serde_json::from_str(&text).map_err(|e| {
+        AppError::Api(format!("Failed to parse login response: {}. Response: {}", e, text))
+    })?;
+
+    if json_resp.code != 200 {
+        return Err(AppError::Api(format!("Login failed: {}", json_resp.message)));
+    }
+
+    let data = json_resp.data.ok_or_else(|| AppError::Api("No token in login response".to_string()))?;
+    
+    Ok(data.token)
 }

@@ -1203,7 +1203,19 @@ fn resolve_download_url(file: &FileItem, settings: &SiteSettings) -> String {
     let base = settings.download_base_url.as_ref().unwrap_or(&settings.api_base_url);
     let base = base.trim_end_matches('/');
     
-    let encoded_path = file.path.split('/')
+    // If user has a base path configured (e.g. "/abc"), prepend it to the file path
+    let full_path = if let Some(user_base) = &settings.user_base_path {
+        let user_base = user_base.trim_end_matches('/');
+        if user_base.is_empty() || user_base == "/" {
+            file.path.clone()
+        } else {
+            format!("{}{}", user_base, file.path)
+        }
+    } else {
+        file.path.clone()
+    };
+    
+    let encoded_path = full_path.split('/')
         .map(|segment| urlencoding::encode(segment))
         .collect::<Vec<_>>()
         .join("/");

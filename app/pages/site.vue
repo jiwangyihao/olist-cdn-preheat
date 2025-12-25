@@ -179,9 +179,51 @@
 								<UInput v-model="state.apiBaseUrl" @blur="onApiUrlChange" />
 							</UFormField>
 
-							<UFormField label="Token" name="token" help="公开站点可留空">
+							<!-- Auth Type Selection -->
+							<UFormField label="认证方式" name="authType">
+								<URadioGroup
+									v-model="state.authType"
+									:items="[
+										{ label: 'Token', value: 'token' },
+										{ label: '账号密码', value: 'password' }
+									]"
+									orientation="horizontal"
+								/>
+							</UFormField>
+
+							<!-- Token Auth -->
+							<UFormField v-if="state.authType !== 'password'" label="Token" name="token" help="公开站点可留空">
 								<UInput v-model="state.token" type="password" />
 							</UFormField>
+
+							<!-- Password Auth -->
+							<template v-else>
+								<UFormField label="用户名" name="username">
+									<UInput v-model="state.username" placeholder="admin" />
+								</UFormField>
+								<UFormField label="密码" name="loginPassword" help="密码不会保存">
+									<UInput v-model="loginPassword" type="password" placeholder="输入密码" />
+								</UFormField>
+								<div class="flex items-center gap-2">
+									<UButton
+										:loading="isLoggingIn"
+										:disabled="!state.apiBaseUrl || !state.username || !loginPassword"
+										color="primary"
+										variant="soft"
+										size="sm"
+										icon="i-heroicons-key"
+										@click.prevent="doLogin"
+									>
+										登录获取 Token
+									</UButton>
+									<span v-if="state.token" class="text-xs text-green-600 dark:text-green-400">
+										✓ 已获取 Token
+									</span>
+								</div>
+								<UFormField label="用户 Base 路径" name="userBasePath" help="账号的根目录路径（如 /abc），留空表示 /">
+									<UInput v-model="state.userBasePath" placeholder="/" />
+								</UFormField>
+							</template>
 						</div>
 					</UCard>
 
@@ -262,6 +304,7 @@
 	import type { FormSubmitEvent } from "#ui/types";
 	import type { SiteSettings } from "~/types";
 	import { listen } from "@tauri-apps/api/event";
+	import { invoke } from "@tauri-apps/api/core";
 	import { computed } from "vue";
 	import { z } from "zod";
 
@@ -285,6 +328,8 @@
 			downloadBaseUrl: "",
 			startPath: "/",
 			token: "",
+			authType: "token",
+			username: "",
 			dirPassword: "",
 			proxyUrl: "",
 			userAgent: "olist-cdn-preheat/0.1 (Mozilla/5.0 compatible)",
@@ -306,6 +351,10 @@
 		return current?.name ? `确定删除站点「${current.name}」吗？` : "确定删除当前站点吗？";
 	});
 
+	// Login state
+	const loginPassword = ref("");
+	const isLoggingIn = ref(false);
+
 	const state = ref<SiteSettings>(createDefaultSite());
 
 	const schema = z.object({
@@ -314,6 +363,8 @@
 		startPath: z.string().startsWith("/", "必须以 / 开头"),
 		downloadBaseUrl: z.string().url("无效的 URL").optional().or(z.literal("")),
 		token: z.string().optional(),
+		authType: z.enum(["token", "password"]).optional(),
+		username: z.string().optional(),
 		dirPassword: z.string().optional(),
 		proxyUrl: z.string().optional(),
 		userAgent: z.string().optional(),
@@ -509,6 +560,34 @@
 		if ((!state.value.name || state.value.name === "我的站点") && state.value.apiBaseUrl) {
 			const inferred = inferSiteName(state.value.apiBaseUrl);
 			if (inferred) state.value.name = inferred;
+		}
+	}
+
+	async function doLogin() {
+		if (!state.value.apiBaseUrl || !state.value.username || !loginPassword.value) {
+			toast.add({ title: "请填写完整的登录信息", color: "warning" });
+			return;
+		}
+
+		isLoggingIn.value = true;
+		try {
+			const token = await invoke<string>("login", {
+				baseUrl: state.value.apiBaseUrl,
+				username: state.value.username,
+				password: loginPassword.value,
+				proxyUrl: state.value.proxyUrl || null
+			});
+			
+			state.value.token = token;
+			loginPassword.value = ""; // Clear password after successful login
+			upsertActiveSite();
+			persistAll();
+			toast.add({ title: "登录成功", description: "Token 已自动填充", color: "success" });
+		} catch (e: any) {
+			const msg = typeof e === "string" ? e : (e?.message || "登录失败");
+			toast.add({ title: "登录失败", description: msg, color: "error" });
+		} finally {
+			isLoggingIn.value = false;
 		}
 	}
 

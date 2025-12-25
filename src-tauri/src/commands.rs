@@ -156,3 +156,18 @@ pub async fn cancel_run(state: State<'_, AppState>) -> AppResult<()> {
     }
     Ok(())
 }
+
+#[tauri::command]
+pub async fn login(
+    base_url: String,
+    username: String,
+    password: String,
+    proxy_url: Option<String>,
+) -> AppResult<String> {
+    crate::api::login_with_password(
+        &base_url,
+        &username,
+        &password,
+        proxy_url.as_deref(),
+    ).await
+}

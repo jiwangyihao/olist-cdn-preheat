@@ -50,7 +50,8 @@ pub fn run() {
             commands::start_run,
 			commands::start_run_multi,
             commands::cancel_run,
-            commands::retry_files
+            commands::retry_files,
+            commands::login
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
